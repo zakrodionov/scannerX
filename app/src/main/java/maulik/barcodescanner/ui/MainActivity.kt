@@ -24,14 +24,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
         setContentView(binding.root)
 
-        binding.cardMlKit.setOnClickListener {
-            selectedScanningSDK = BarcodeScanningActivity.ScannerSDK.MLKIT
-            startScanning()
-        }
-        binding.cardZxing.setOnClickListener {
-            selectedScanningSDK = BarcodeScanningActivity.ScannerSDK.ZXING
-            startScanning()
-        }
+        selectedScanningSDK = BarcodeScanningActivity.ScannerSDK.MLKIT
+        startScanning()
     }
 
     private fun startScanning() {
