@@ -125,8 +125,9 @@ class BarcodeScanningActivity : AppCompatActivity() {
         preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
 
         val useCases = UseCaseGroup.Builder()
-            .addUseCase(imageAnalysis)
+            .setViewPort(binding.cameraPreview.viewPort!!)
             .addUseCase(preview)
+            .addUseCase(imageAnalysis)
             .build()
 
         val camera =
