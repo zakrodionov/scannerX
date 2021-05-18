@@ -24,8 +24,8 @@ class MLKitBarcodeAnalyzer(private val listener: ScanningResultListener, private
 
             val bitmap = mediaImage.toBitmap(overlay.context)
             val cropped = bitmap.crop(imageProxy.cropRect)
-            val rotated = cropped.rotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-            val image = InputImage.fromBitmap(rotated, imageProxy.imageInfo.rotationDegrees)
+            val rotated = cropped.rotate(90f)
+            val image = InputImage.fromBitmap(rotated, 90)
             val scanner = BarcodeScanning.getClient()
 
             debug(imageProxy.cropRect.toShortString())
