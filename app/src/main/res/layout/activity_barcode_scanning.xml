@@ -59,4 +59,11 @@
         android:padding="12dp"
         android:src="@drawable/ic_round_flash_on" />
 
+    <ImageView
+        android:id="@+id/ivCropPreview"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_margin="16dp" />
+
 </FrameLayout>
