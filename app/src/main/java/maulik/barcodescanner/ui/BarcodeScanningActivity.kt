@@ -118,7 +118,7 @@ class BarcodeScanningActivity : AppCompatActivity() {
             }
         }
 
-        val analyzer: ImageAnalysis.Analyzer = MLKitBarcodeAnalyzer(ScanningListener())
+        val analyzer: ImageAnalysis.Analyzer = MLKitBarcodeAnalyzer(ScanningListener(), binding.overlay)
 
         imageAnalysis.setAnalyzer(cameraExecutor, analyzer)
 

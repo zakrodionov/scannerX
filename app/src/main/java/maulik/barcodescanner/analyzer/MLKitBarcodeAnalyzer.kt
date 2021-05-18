@@ -6,9 +6,13 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
-import maulik.barcodescanner.debug
+import maulik.barcodescanner.ui.custom.ViewFinderOverlay
+import maulik.barcodescanner.util.crop
+import maulik.barcodescanner.util.debug
+import maulik.barcodescanner.util.rotate
+import maulik.barcodescanner.util.toBitmap
 
-class MLKitBarcodeAnalyzer(private val listener: ScanningResultListener) : ImageAnalysis.Analyzer {
+class MLKitBarcodeAnalyzer(private val listener: ScanningResultListener, private val  overlay: ViewFinderOverlay) : ImageAnalysis.Analyzer {
 
     private var isScanning: Boolean = false
 
@@ -18,10 +22,15 @@ class MLKitBarcodeAnalyzer(private val listener: ScanningResultListener) : Image
         val mediaImage = imageProxy.image
         if (mediaImage != null && !isScanning) {
 
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val bitmap = mediaImage.toBitmap(overlay.context)
+            val cropped = bitmap.crop(imageProxy.cropRect)
+            val rotated = cropped.rotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+            val image = InputImage.fromBitmap(rotated, imageProxy.imageInfo.rotationDegrees)
             val scanner = BarcodeScanning.getClient()
 
             debug(imageProxy.cropRect.toShortString())
+            debug("bitmap --- w - ${bitmap.width} --- h - ${bitmap.height} ")
+            debug("image --- w - ${image.width} --- h - ${image.height} ")
 
             isScanning = true
             scanner.process(image)

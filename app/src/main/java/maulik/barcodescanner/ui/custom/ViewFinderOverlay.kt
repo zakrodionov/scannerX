@@ -27,7 +27,8 @@ class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, a
     private val boxCornerRadius: Float =
         context.resources.getDimensionPixelOffset(R.dimen.barcode_reticle_corner_radius).toFloat()
 
-    private var boxRect: RectF? = null
+    var boxRect: RectF? = null
+        private set
 
     fun setViewFinder() {
         val overlayWidth = width.toFloat()
@@ -36,7 +37,8 @@ class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, a
         val boxHeight = overlayHeight * 36 / 100
         val cx = overlayWidth / 2
         val cy = overlayHeight / 2
-        boxRect = RectF(cx - boxWidth / 2, cy - boxHeight / 2, cx + boxWidth / 2, cy + boxHeight / 2)
+        boxRect =
+            RectF(cx - boxWidth / 2, cy - boxHeight / 2, cx + boxWidth / 2, cy + boxHeight / 2)
 
         invalidate()
     }
