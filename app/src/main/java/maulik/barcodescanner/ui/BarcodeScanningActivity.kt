@@ -1,5 +1,6 @@
 package maulik.barcodescanner.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -8,17 +9,13 @@ import android.view.OrientationEventListener
 import android.view.Surface
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.core.TorchState
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.google.common.util.concurrent.ListenableFuture
 import maulik.barcodescanner.R
 import maulik.barcodescanner.analyzer.MLKitBarcodeAnalyzer
 import maulik.barcodescanner.analyzer.ScanningResultListener
-import maulik.barcodescanner.analyzer.ZXingBarcodeAnalyzer
 import maulik.barcodescanner.databinding.ActivityBarcodeScanningBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -42,19 +39,14 @@ class BarcodeScanningActivity : AppCompatActivity() {
     /** Blocking camera operations are performed using this executor */
     private lateinit var cameraExecutor: ExecutorService
     private var flashEnabled = false
-    private var scannerSDK: ScannerSDK = ScannerSDK.MLKIT //default is MLKit
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBarcodeScanningBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        scannerSDK = intent?.getSerializableExtra(ARG_SCANNING_SDK) as ScannerSDK
 
-        when (scannerSDK) {
-            ScannerSDK.MLKIT -> binding.ivScannerLogo.setImageResource(R.drawable.mlkit_icon)
-            ScannerSDK.ZXING -> binding.ivScannerLogo.setImageResource(R.drawable.zxing)
-        }
+        binding.ivScannerLogo.setImageResource(R.drawable.mlkit_icon)
 
         cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         // Initialize our background executor
@@ -70,6 +62,7 @@ class BarcodeScanningActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("UnsafeOptInUsageError")
     private fun bindPreview(cameraProvider: ProcessCameraProvider?) {
 
         if (isDestroyed || isFinishing) {
@@ -125,18 +118,19 @@ class BarcodeScanningActivity : AppCompatActivity() {
             }
         }
 
-        var analyzer: ImageAnalysis.Analyzer = MLKitBarcodeAnalyzer(ScanningListener())
-
-        if (scannerSDK == ScannerSDK.ZXING) {
-            analyzer = ZXingBarcodeAnalyzer(ScanningListener())
-        }
+        val analyzer: ImageAnalysis.Analyzer = MLKitBarcodeAnalyzer(ScanningListener())
 
         imageAnalysis.setAnalyzer(cameraExecutor, analyzer)
 
         preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
 
+        val useCases = UseCaseGroup.Builder()
+            .addUseCase(imageAnalysis)
+            .addUseCase(preview)
+            .build()
+
         val camera =
-            cameraProvider?.bindToLifecycle(this, cameraSelector, imageAnalysis, preview)
+            cameraProvider?.bindToLifecycle(this, cameraSelector, useCases)
 
         if (camera?.cameraInfo?.hasFlashUnit() == true) {
             binding.ivFlashControl.visibility = View.VISIBLE
@@ -157,7 +151,6 @@ class BarcodeScanningActivity : AppCompatActivity() {
                 }
             }
         }
-
 
     }
 
