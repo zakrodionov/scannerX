@@ -32,6 +32,9 @@ class BarcodeScanningActivity : AppCompatActivity() {
             }
             context.startActivity(starter)
         }
+
+        private const val TARGET_PREVIEW_WIDTH = 960
+        private const val TARGET_PREVIEW_HEIGHT = 1280
     }
 
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
@@ -74,6 +77,7 @@ class BarcodeScanningActivity : AppCompatActivity() {
         cameraProvider?.unbindAll()
 
         val preview: Preview = Preview.Builder()
+            .setTargetResolution(Size(TARGET_PREVIEW_WIDTH, TARGET_PREVIEW_HEIGHT))
             .build()
 
         val cameraSelector: CameraSelector = CameraSelector.Builder()
@@ -81,24 +85,9 @@ class BarcodeScanningActivity : AppCompatActivity() {
             .build()
 
         val imageAnalysis = ImageAnalysis.Builder()
-            //.setTargetResolution(Size(1080, 1920))
+            .setTargetResolution(Size(TARGET_PREVIEW_WIDTH, TARGET_PREVIEW_HEIGHT))
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
-
-        val orientationEventListener = object : OrientationEventListener(this as Context) {
-            override fun onOrientationChanged(orientation : Int) {
-                // Monitors orientation values to determine the target rotation value
-                val rotation : Int = when (orientation) {
-                    in 45..134 -> Surface.ROTATION_270
-                    in 135..224 -> Surface.ROTATION_180
-                    in 225..314 -> Surface.ROTATION_90
-                    else -> Surface.ROTATION_0
-                }
-
-                imageAnalysis.targetRotation = rotation
-            }
-        }
-        orientationEventListener.enable()
 
         //switch the analyzers here, i.e. MLKitBarcodeAnalyzer, ZXingBarcodeAnalyzer
         class ScanningListener : ScanningResultListener {
@@ -124,9 +113,7 @@ class BarcodeScanningActivity : AppCompatActivity() {
 
         preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
 
-        val viewPort = binding.cameraPreview.viewPort!!
         val useCases = UseCaseGroup.Builder()
-            .setViewPort(viewPort)
             .addUseCase(preview)
             .addUseCase(imageAnalysis)
             .build()
