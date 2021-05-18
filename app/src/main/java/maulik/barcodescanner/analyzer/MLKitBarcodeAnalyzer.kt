@@ -1,5 +1,7 @@
 package maulik.barcodescanner.analyzer
 
+import android.graphics.Bitmap
+import android.graphics.Rect
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
@@ -14,6 +16,7 @@ import maulik.barcodescanner.util.crop
 import maulik.barcodescanner.util.debug
 import maulik.barcodescanner.util.rotate
 import maulik.barcodescanner.util.toBitmap
+import java.io.ByteArrayOutputStream
 
 const val PORTRAIT_DEGREES = 90
 
@@ -33,15 +36,15 @@ class MLKitBarcodeAnalyzer(
         if (mediaImage != null && !isScanning) {
 
             val bitmap = mediaImage.toBitmap(overlay.context)
-            val croppedByPreview = bitmap.crop(imageProxy.cropRect)
-            val rotated = croppedByPreview.rotate(PORTRAIT_DEGREES.toFloat())
-            val croppedByBarcodeFinder = rotated.crop(overlay.boxRect!!.toRect(), overlay)
-            val image = InputImage.fromBitmap(croppedByBarcodeFinder, PORTRAIT_DEGREES)
+            val croppedByViewPort = bitmap.crop(imageProxy.cropRect)
+            val rotated = croppedByViewPort.rotate(PORTRAIT_DEGREES.toFloat())
+            val croppedByBarcodeFinder = cropBitmap(rotated, overlay, overlay.boxRect!!.toRect())
+            val image = InputImage.fromBitmap(croppedByBarcodeFinder, 90)
             val scanner = BarcodeScanning.getClient()
 
             cropPreview.post {
                 cropPreview.setImageBitmap(croppedByBarcodeFinder)
-            }
+            } // TODO
 
             debug(imageProxy.cropRect.toShortString())
             debug("bitmap --- w - ${bitmap.width} --- h - ${bitmap.height} ")
@@ -66,4 +69,53 @@ class MLKitBarcodeAnalyzer(
                 }
         }
     }
+
+    // bitmap - image from camera
+    // frame - camera preview (usually phone screen resolution)
+    // cropArea - crop view finder (Qr or BarCode)
+    fun cropBitmap(bitmap: Bitmap, frame: View, cropArea: Rect): Bitmap {
+        val frameHeight = frame.height
+        val frameWidth = frame.width
+        val cropHeight = cropArea.height()
+        val cropWidth = cropArea.width()
+        val cropLeft = cropArea.left
+        val cropTop = cropArea.top
+        val imageHeight = bitmap.height
+        val imageWidth = bitmap.width
+        val widthFinal = cropWidth * imageWidth / frameWidth
+        val heightFinal = cropHeight * imageHeight / frameHeight
+        val leftFinal = cropLeft * imageWidth / frameWidth
+        val topFinal = cropTop * imageHeight / frameHeight
+        val bitmapFinal = Bitmap.createBitmap(
+            bitmap,
+            leftFinal, topFinal, widthFinal, heightFinal
+        )
+
+        return bitmapFinal
+    }
+
+    // bitmap - image from camera
+    // frame - camera preview (usually phone screen resolution)
+    // cropArea - crop view finder (Qr or BarCode)
+    fun cropBitmap(bitmap: Bitmap, frame: View, cropArea: View): Bitmap {
+        val frameHeight = frame.height
+        val frameWidth = frame.width
+        val cropHeight = cropArea.height
+        val cropWidth = cropArea.width
+        val cropLeft = cropArea.left
+        val cropTop = cropArea.top
+        val imageHeight = bitmap.height
+        val imageWidth = bitmap.width
+        val widthFinal = cropWidth * imageWidth / frameWidth
+        val heightFinal = cropHeight * imageHeight / frameHeight
+        val leftFinal = cropLeft * imageWidth / frameWidth
+        val topFinal = cropTop * imageHeight / frameHeight
+        val bitmapFinal = Bitmap.createBitmap(
+            bitmap,
+            leftFinal, topFinal, widthFinal, heightFinal
+        )
+
+        return bitmapFinal
+    }
+
 }

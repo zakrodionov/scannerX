@@ -81,7 +81,7 @@ class BarcodeScanningActivity : AppCompatActivity() {
             .build()
 
         val imageAnalysis = ImageAnalysis.Builder()
-            //.setTargetResolution(Size(1080, 1920))
+            .setTargetResolution(Size(binding.cameraPreview.width, binding.cameraPreview.height))
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
 
@@ -123,6 +123,8 @@ class BarcodeScanningActivity : AppCompatActivity() {
         imageAnalysis.setAnalyzer(cameraExecutor, analyzer)
 
         preview.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
+
+        binding.cameraPreview.previewStreamState
 
         val viewPort = binding.cameraPreview.viewPort!!
         val useCases = UseCaseGroup.Builder()
