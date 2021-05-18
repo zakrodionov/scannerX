@@ -1,24 +1,17 @@
 package maulik.barcodescanner.analyzer
 
-import android.graphics.Bitmap
 import android.graphics.Rect
+import android.media.Image
 import android.util.Log
-import android.view.View
+import android.util.Size
 import android.widget.ImageView
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import androidx.core.graphics.toRect
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import maulik.barcodescanner.ui.custom.ViewFinderOverlay
-import maulik.barcodescanner.util.crop
-import maulik.barcodescanner.util.debug
-import maulik.barcodescanner.util.rotate
-import maulik.barcodescanner.util.toBitmap
-import java.io.ByteArrayOutputStream
-
-const val PORTRAIT_DEGREES = 90
+import maulik.barcodescanner.util.*
 
 class MLKitBarcodeAnalyzer(
     private val listener: ScanningResultListener,
@@ -32,26 +25,46 @@ class MLKitBarcodeAnalyzer(
     @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
 
-        val mediaImage = imageProxy.image
-        if (mediaImage != null && !isScanning) {
+        try {
+            val imageProxyReadyEpoch = System.currentTimeMillis()
+            val rotation = imageProxy.imageInfo.rotationDegrees
+            debug("New image from proxy width : ${imageProxy.width} height : ${imageProxy.height} format : ${imageProxy.format} rotation: $rotation")
+            val scannerRect = getScannerRectToPreviewViewRelation(
+                Size(imageProxy.width, imageProxy.height),
+                rotation
+            )
 
-            val bitmap = mediaImage.toBitmap(overlay.context)
-            val croppedByViewPort = bitmap.crop(imageProxy.cropRect)
-            val rotated = croppedByViewPort.rotate(PORTRAIT_DEGREES.toFloat())
-            val croppedByBarcodeFinder = cropBitmap(rotated, overlay, overlay.boxRect!!.toRect())
-            val image = InputImage.fromBitmap(croppedByBarcodeFinder, 90)
-            val scanner = BarcodeScanning.getClient()
+            val image = imageProxy.image!!
+            val cropRect = image.getCropRectAccordingToRotation(scannerRect, rotation)
+            image.cropRect = cropRect
+
+            val byteArray = YuvNV21Util.yuv420toNV21(image)
+            val bitmap = BitmapUtil.getBitmap(
+                byteArray,
+                FrameMetadata(cropRect.width(), cropRect.height(), rotation)
+            )
+            debug("Bitmap prepared width: ${cropRect.width()} height: ${cropRect.height()}")
+            val imagePreparedReadyEpoch = System.currentTimeMillis()
+
+
+            val imageProcessedEpoch = System.currentTimeMillis()
+
+            debug(
+                """
+                   Image proxy (${imageProxy.width},${imageProxy.height}) format : ${imageProxy.format} rotation: $rotation 
+                   Cropped Image (${bitmap.width},${bitmap.height}) Preparing took: ${imagePreparedReadyEpoch - imageProxyReadyEpoch}ms
+                   OCR Processing took : ${imageProcessedEpoch - imagePreparedReadyEpoch}
+                """.trimIndent()
+            )
+
 
             cropPreview.post {
-                cropPreview.setImageBitmap(croppedByBarcodeFinder)
-            } // TODO
-
-            debug(imageProxy.cropRect.toShortString())
-            debug("bitmap --- w - ${bitmap.width} --- h - ${bitmap.height} ")
-            debug("image --- w - ${image.width} --- h - ${image.height} ")
+                cropPreview.setImageBitmap(bitmap)
+            }
 
             isScanning = true
-            scanner.process(image)
+            val scanner = BarcodeScanning.getClient()
+            scanner.process(InputImage.fromBitmap(bitmap, 0))
                 .addOnSuccessListener { barcodes ->
                     barcodes?.firstOrNull().let { barcode ->
                         val rawValue = barcode?.rawValue
@@ -67,55 +80,104 @@ class MLKitBarcodeAnalyzer(
                     isScanning = false
                     imageProxy.close()
                 }
+        } catch (e: Exception) {
+            imageProxy.close()
+            debug("on error")
         }
     }
 
-    // bitmap - image from camera
-    // frame - camera preview (usually phone screen resolution)
-    // cropArea - crop view finder (Qr or BarCode)
-    fun cropBitmap(bitmap: Bitmap, frame: View, cropArea: Rect): Bitmap {
-        val frameHeight = frame.height
-        val frameWidth = frame.width
-        val cropHeight = cropArea.height()
-        val cropWidth = cropArea.width()
-        val cropLeft = cropArea.left
-        val cropTop = cropArea.top
-        val imageHeight = bitmap.height
-        val imageWidth = bitmap.width
-        val widthFinal = cropWidth * imageWidth / frameWidth
-        val heightFinal = cropHeight * imageHeight / frameHeight
-        val leftFinal = cropLeft * imageWidth / frameWidth
-        val topFinal = cropTop * imageHeight / frameHeight
-        val bitmapFinal = Bitmap.createBitmap(
-            bitmap,
-            leftFinal, topFinal, widthFinal, heightFinal
-        )
 
-        return bitmapFinal
+    private fun getScannerRectToPreviewViewRelation(
+        proxySize: Size,
+        rotation: Int
+    ): ScannerRectToPreviewViewRelation {
+        return when (rotation) {
+            0, 180 -> {
+                val size = overlay.size
+                val width = size.width
+                val height = size.height
+                val previewHeight = width / (proxySize.width.toFloat() / proxySize.height)
+                val heightDeltaTop = (previewHeight - height) / 2
+
+                val scannerRect = overlay.boxRectF!!
+                val rectStartX = scannerRect.left
+                val rectStartY = heightDeltaTop + scannerRect.top
+
+                ScannerRectToPreviewViewRelation(
+                    rectStartX / width,
+                    rectStartY / previewHeight,
+                    scannerRect.width() / width,
+                    scannerRect.height() / previewHeight
+                )
+            }
+            90, 270 -> {
+                val size = overlay.size
+                val width = size.width
+                val height = size.height
+                val previewWidth = height / (proxySize.width.toFloat() / proxySize.height)
+                val widthDeltaLeft = (previewWidth - width) / 2
+
+                val scannerRect = overlay.boxRectF!!
+                val rectStartX = widthDeltaLeft + scannerRect.left
+                val rectStartY = scannerRect.top
+
+                ScannerRectToPreviewViewRelation(
+                    rectStartX / previewWidth,
+                    rectStartY / height,
+                    scannerRect.width() / previewWidth,
+                    scannerRect.height() / height
+                )
+            }
+            else -> throw IllegalArgumentException("Rotation degree ($rotation) not supported!")
+        }
     }
 
-    // bitmap - image from camera
-    // frame - camera preview (usually phone screen resolution)
-    // cropArea - crop view finder (Qr or BarCode)
-    fun cropBitmap(bitmap: Bitmap, frame: View, cropArea: View): Bitmap {
-        val frameHeight = frame.height
-        val frameWidth = frame.width
-        val cropHeight = cropArea.height
-        val cropWidth = cropArea.width
-        val cropLeft = cropArea.left
-        val cropTop = cropArea.top
-        val imageHeight = bitmap.height
-        val imageWidth = bitmap.width
-        val widthFinal = cropWidth * imageWidth / frameWidth
-        val heightFinal = cropHeight * imageHeight / frameHeight
-        val leftFinal = cropLeft * imageWidth / frameWidth
-        val topFinal = cropTop * imageHeight / frameHeight
-        val bitmapFinal = Bitmap.createBitmap(
-            bitmap,
-            leftFinal, topFinal, widthFinal, heightFinal
-        )
+    data class ScannerRectToPreviewViewRelation(
+        val relativePosX: Float,
+        val relativePosY: Float,
+        val relativeWidth: Float,
+        val relativeHeight: Float
+    )
 
-        return bitmapFinal
+    private fun Image.getCropRectAccordingToRotation(
+        scannerRect: ScannerRectToPreviewViewRelation,
+        rotation: Int
+    ): Rect {
+        return when (rotation) {
+            0 -> {
+                val startX = (scannerRect.relativePosX * this.width).toInt()
+                val numberPixelW = (scannerRect.relativeWidth * this.width).toInt()
+                val startY = (scannerRect.relativePosY * this.height).toInt()
+                val numberPixelH = (scannerRect.relativeHeight * this.height).toInt()
+                Rect(startX, startY, startX + numberPixelW, startY + numberPixelH)
+            }
+            90 -> {
+                val startX = (scannerRect.relativePosY * this.width).toInt()
+                val numberPixelW = (scannerRect.relativeHeight * this.width).toInt()
+                val numberPixelH = (scannerRect.relativeWidth * this.height).toInt()
+                val startY =
+                    height - (scannerRect.relativePosX * this.height).toInt() - numberPixelH
+                Rect(startX, startY, startX + numberPixelW, startY + numberPixelH)
+            }
+            180 -> {
+                val numberPixelW = (scannerRect.relativeWidth * this.width).toInt()
+                val startX =
+                    (this.width - scannerRect.relativePosX * this.width - numberPixelW).toInt()
+                val numberPixelH = (scannerRect.relativeHeight * this.height).toInt()
+                val startY =
+                    (height - scannerRect.relativePosY * this.height - numberPixelH).toInt()
+                Rect(startX, startY, startX + numberPixelW, startY + numberPixelH)
+            }
+            270 -> {
+                val numberPixelW = (scannerRect.relativeHeight * this.width).toInt()
+                val numberPixelH = (scannerRect.relativeWidth * this.height).toInt()
+                val startX =
+                    (this.width - scannerRect.relativePosY * this.width - numberPixelW).toInt()
+                val startY = (scannerRect.relativePosX * this.height).toInt()
+                Rect(startX, startY, startX + numberPixelW, startY + numberPixelH)
+            }
+            else -> throw IllegalArgumentException("Rotation degree ($rotation) not supported!")
+        }
     }
 
 }

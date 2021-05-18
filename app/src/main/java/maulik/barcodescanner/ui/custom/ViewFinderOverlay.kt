@@ -3,8 +3,10 @@ package maulik.barcodescanner.ui.custom
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.util.Size
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.toRect
 import maulik.barcodescanner.R
 
 class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, attrs) {
@@ -27,8 +29,14 @@ class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, a
     private val boxCornerRadius: Float =
         context.resources.getDimensionPixelOffset(R.dimen.barcode_reticle_corner_radius).toFloat()
 
-    var boxRect: RectF? = null
+    var boxRectF: RectF? = null
         private set
+
+    val boxRect: Rect
+        get() = boxRectF!!.toRect()
+
+    val size: Size
+        get() = Size(width, height)
 
     fun setViewFinder() {
         val overlayWidth = width.toFloat()
@@ -37,7 +45,7 @@ class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, a
         val boxHeight = overlayHeight * 36 / 100
         val cx = overlayWidth / 2
         val cy = overlayHeight / 2
-        boxRect =
+        boxRectF =
             RectF(cx - boxWidth / 2, cy - boxHeight / 2, cx + boxWidth / 2, cy + boxHeight / 2)
 
         invalidate()
@@ -45,7 +53,7 @@ class ViewFinderOverlay(context: Context, attrs: AttributeSet) : View(context, a
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
-        boxRect?.let {
+        boxRectF?.let {
             // Draws the dark background scrim and leaves the box area clear.
             canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), scrimPaint)
             // As the stroke is always centered, so erase twice with FILL and STROKE respectively to clear
